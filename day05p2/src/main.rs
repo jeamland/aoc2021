@@ -64,11 +64,27 @@ impl Field {
             for y in start..=end {
                 self.0[y as usize][line.0 .0 as usize] += 1;
             }
-        } else {
+        } else if line.0 .1 == line.1 .1 {
             let (start, end) = (line.0 .0.min(line.1 .0), line.0 .0.max(line.1 .0));
 
             for x in start..=end {
                 self.0[line.0 .1 as usize][x as usize] += 1;
+            }
+        } else {
+            let (start_x, end_x) = (line.0 .0.min(line.1 .0), line.0 .0.max(line.1 .0));
+            let mut xs: Vec<u32> = (start_x..=end_x).collect();
+            if line.0 .0 > line.1 .0 {
+                xs.reverse();
+            }
+
+            let (start_y, end_y) = (line.0 .1.min(line.1 .1), line.0 .1.max(line.1 .1));
+            let mut ys: Vec<u32> = (start_y..=end_y).collect();
+            if line.0 .1 > line.1 .1 {
+                ys.reverse();
+            }
+
+            for (x, y) in xs.into_iter().zip(ys.into_iter()) {
+                self.0[y as usize][x as usize] += 1;
             }
         }
     }
@@ -98,12 +114,10 @@ fn main() -> Result<()> {
     let file = File::open(std::env::args_os().nth(1).unwrap()).unwrap();
     let reader = BufReader::new(file);
 
-    let mut lines: Vec<Line> = reader
+    let lines: Vec<Line> = reader
         .lines()
         .map(|line| line?.parse::<Line>())
         .collect::<Result<Vec<Line>>>()?;
-
-    lines.retain(|line| line.0 .0 == line.1 .0 || line.0 .1 == line.1 .1);
 
     let max_x = lines
         .iter()
