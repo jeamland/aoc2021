@@ -80,7 +80,7 @@ fn main() {
             .reduce(|a, i| a * 10 + i)
             .unwrap();
 
-        println!("{} -> {:?}", patterns, number);
+        println!("{} -> {:04?}", patterns, number);
         sum += number;
     }
 
