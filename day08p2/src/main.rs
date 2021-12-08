@@ -17,7 +17,7 @@ fn deduce_numbers(signals: &[BTreeSet<char>]) -> HashMap<BTreeSet<char>, u32> {
     let eight = signals.iter().find(|s| s.len() == 7).unwrap();
     let nine = signals
         .iter()
-        .find(|s| s.len() == 6 && s.is_superset(one) && s.is_superset(three))
+        .find(|s| s.len() == 6 && s.is_superset(three))
         .unwrap();
 
     let bottom_left = eight - nine;
