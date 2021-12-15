@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
@@ -6,29 +6,17 @@ fn find_path(cavern: Vec<Vec<usize>>) -> usize {
     let x_max = cavern[0].len() - 1;
     let y_max = cavern.len() - 1;
 
-    let mut open_set = HashSet::new();
-    let mut f_score = vec![(0usize, 0usize, x_max + y_max)];
-    let mut g_score = HashMap::new();
+    let mut f_score = vec![(0, 0, x_max + y_max)];
+    let mut g_score = HashMap::from([((0, 0), 0)]);
 
-    open_set.insert((0, 0));
-    g_score.insert((0, 0), 0);
-
-    while !open_set.is_empty() {
+    while !f_score.is_empty() {
         let (x, y, _) = f_score.remove(0);
-        println!(
-            "({:3}, {:3}) {:6} {:6} {:6}",
-            x,
-            y,
-            open_set.len(),
-            f_score.len(),
-            g_score.len()
-        );
+        println!("({:3}, {:3}) {:6} {:6}", x, y, f_score.len(), g_score.len());
 
         if x == x_max && y == y_max {
             return *g_score.get(&(x, y)).unwrap();
         }
 
-        open_set.remove(&(x, y));
         let g = g_score.get(&(x, y)).copied().unwrap_or(usize::MAX);
 
         let mut neighbours = Vec::new();
@@ -56,7 +44,6 @@ fn find_path(cavern: Vec<Vec<usize>>) -> usize {
                 } else {
                     f_score.push((dx, dy, f));
                 }
-                open_set.insert((dx, dy));
             }
         }
     }
