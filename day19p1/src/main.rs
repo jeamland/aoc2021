@@ -4,14 +4,13 @@ use std::io::{BufRead, BufReader};
 use std::ops::{Add, AddAssign, Neg, Sub};
 
 use itertools::Itertools;
-use ndarray::Axis;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct Pointlike(i64, i64, i64);
 
 impl Pointlike {
     fn rotate(&self, rotation: Rotation) -> Self {
-        let mut rotated = self.clone();
+        let mut rotated = *self;
 
         rotated = match rotation.0 {
             AxisRotation::None => rotated,
@@ -74,17 +73,6 @@ enum AxisRotation {
     Third,
 }
 
-impl AxisRotation {
-    fn increment(&self) -> AxisRotation {
-        match self {
-            AxisRotation::None => AxisRotation::First,
-            AxisRotation::First => AxisRotation::Second,
-            AxisRotation::Second => AxisRotation::Third,
-            AxisRotation::Third => AxisRotation::None,
-        }
-    }
-}
-
 impl std::fmt::Display for AxisRotation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -143,7 +131,7 @@ impl Add<usize> for AxisRotation {
     type Output = Self;
 
     fn add(self, rhs: usize) -> Self {
-        let mut new = self.clone();
+        let mut new = self;
         new += rhs;
         new
     }
@@ -243,7 +231,7 @@ impl Rotator {
 }
 
 impl Iterator for Rotator {
-    type Item = (Rotation, Vec<(usize, usize, Pointlike)>);
+    type Item = (Rotation, HashMap<Pointlike, (usize, usize)>);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.rotation.is_last() {
@@ -253,9 +241,9 @@ impl Iterator for Rotator {
         let rotated = self
             .beacons
             .iter()
-            .map(|(a, b, point)| (*a, *b, point.rotate(self.rotation)))
+            .map(|(a, b, point)| (point.rotate(self.rotation), (*a, *b)))
             .collect();
-        let rotation = self.rotation.clone();
+        let rotation = self.rotation;
 
         self.rotation += 1;
 
@@ -265,7 +253,7 @@ impl Iterator for Rotator {
 
 #[derive(Debug, Default)]
 struct Region {
-    scanners: HashMap<usize, (Pointlike, Rotation, Vec<Pointlike>)>,
+    scanners: HashMap<usize, (Pointlike, Vec<Pointlike>)>,
     beacons: HashSet<Pointlike>,
 }
 
@@ -291,31 +279,20 @@ impl Region {
         for (rotation, rotated) in Rotator::new(&offsets_second) {
             let mut matches = HashSet::new();
             for (a, b, offset_first) in &offsets_first {
-                if let Some((oa, ob, _)) = rotated
-                    .iter()
-                    .find(|(_, _, offset_second)| *offset_first == *offset_second)
-                {
+                if let Some((oa, ob)) = rotated.get(offset_first) {
                     matches.insert((*a, *oa));
                     matches.insert((*b, *ob));
-                } else if let Some((oa, ob, _)) = rotated
-                    .iter()
-                    .find(|(_, _, offset_second)| -*offset_first == *offset_second)
-                {
+                } else if let Some((oa, ob)) = rotated.get(&-*offset_first) {
                     matches.insert((*a, *ob));
                     matches.insert((*b, *oa));
                 }
-            }
 
-            if matches.len() == usize::min(first.len(), 12) {
-                let (id, oid) = matches.iter().next().unwrap();
-                let translation = first[*id] - second[*oid].rotate(rotation);
+                if matches.len() == usize::min(first.len(), 12) {
+                    let (id, oid) = matches.iter().next().unwrap();
+                    let translation = first[*id] - second[*oid].rotate(rotation);
 
-                assert!(matches.iter().all(|(id, oid)| {
-                    let t = first[*id] - second[*oid].rotate(rotation);
-                    t == translation
-                }));
-
-                return Some((rotation, translation));
+                    return Some((rotation, translation));
+                }
             }
         }
 
@@ -326,16 +303,16 @@ impl Region {
         let mut rotation = Rotation::default();
         let mut translation = Pointlike::default();
 
-        if self.scanners.len() != 0 {
+        if !self.scanners.is_empty() {
             let mut found = false;
 
-            for (eid, (location, er, existing)) in &self.scanners {
+            for (eid, (_, existing)) in &self.scanners {
                 if let Some((r, t)) = Self::compare(existing, beacon_locations) {
                     found = true;
-                    rotation = r - *er;
-                    translation = *location + t.rotate(-*er);
+                    rotation = r;
+                    translation = t;
                     println!(
-                        "Scanner {} matched scanner {} @ translation {}, rotation {}",
+                        "Scanner {:2} matched scanner {:2} @ translation {}, rotation {}",
                         id, eid, t, r
                     );
                     break;
@@ -348,31 +325,26 @@ impl Region {
         }
 
         for location in beacon_locations {
-            println!(
-                "scanner {} beacon @ offset {} -> rotation {} = {} -> translation {} = {} or {}",
-                id,
-                location,
-                rotation,
-                location.rotate(rotation),
-                translation,
-                location.rotate(rotation) + translation,
-                *location + translation.rotate(rotation),
-            );
             self.beacons.insert(location.rotate(rotation) + translation);
         }
 
-        self.scanners
-            .insert(id, (translation, rotation, beacon_locations.to_vec()));
+        self.scanners.insert(
+            id,
+            (
+                translation,
+                beacon_locations
+                    .iter()
+                    .map(|l| (*l).rotate(rotation) + translation)
+                    .collect(),
+            ),
+        );
 
         true
     }
 
     fn describe(&self) {
-        let mut scanners: Vec<(usize, Pointlike)> = self
-            .scanners
-            .iter()
-            .map(|(id, (l, _, _))| (*id, *l))
-            .collect();
+        let mut scanners: Vec<(usize, Pointlike)> =
+            self.scanners.iter().map(|(id, (l, _))| (*id, *l)).collect();
         scanners.sort_unstable_by_key(|(id, _)| *id);
 
         for (id, location) in scanners {
@@ -463,12 +435,4 @@ fn main() {
 
     let region: Region = scanners.into_iter().collect();
     region.describe();
-
-    let point = Pointlike(0, 3, 3);
-    let points = vec![(0, 0, point.clone())];
-    for (rotation, rotated) in Rotator::new(&points) {
-        if rotated[0].2 .0 == 3 && rotated[0].2 .1 == 0 && rotated[0].2 .2 == -3 {
-            println!("{} -> {} => {}", point, rotation, rotated[0].2);
-        }
-    }
 }
