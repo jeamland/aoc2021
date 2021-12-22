@@ -10,7 +10,7 @@ fn main() {
 
     let mut cubes = HashSet::new();
 
-    for line in reader.lines() {
+    for (line_number, line) in reader.lines().enumerate() {
         let line = line.unwrap();
         let (state, ranges) = line.split_whitespace().collect_tuple().unwrap();
         let (x_range, y_range, z_range) = if let Some(r) = ranges
@@ -61,6 +61,8 @@ fn main() {
                 }
             }
         }
+
+        println!("After line {}, {} cubes", line_number + 1, cubes.len());
     }
 
     println!("{} cubes", cubes.len());
