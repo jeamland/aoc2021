@@ -426,6 +426,18 @@ impl Path {
         energy_used
     }
 
+    fn path_len_to(&self, to: BurrowId) -> usize {
+        let mut from = to;
+        let mut length = 0;
+
+        while let Some(prev) = self.0.get(&from) {
+            from = prev.0;
+            length += 1;
+        }
+
+        length
+    }
+
     fn path_to(&self, to: BurrowId) -> Vec<BurrowId> {
         let mut from = to;
         let mut path = vec![from];
@@ -480,7 +492,12 @@ fn main() {
             if tentative_g < *current_g {
                 came_from.insert(next, current, energy);
                 *current_g = tentative_g;
-                open.push(next, Reverse(tentative_g + burrowverse.approx_cost(next)));
+                open.push(
+                    next,
+                    Reverse(
+                        tentative_g + burrowverse.approx_cost(next) + came_from.path_len_to(next),
+                    ),
+                );
             }
         }
 
